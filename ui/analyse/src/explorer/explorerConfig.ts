@@ -277,7 +277,7 @@ const prepUploadSection = (ctrl: ExplorerConfigCtrl) =>
         },
         hook: bind('click', ctrl.uploadPrepPgn, ctrl.root.redraw),
       },
-      ctrl.prepUploading() ? 'Uploading...' : 'Upload',
+      ctrl.prepUploading() ? 'Importing...' : 'Import',
     ),
     ctrl.prepUploadInfo() ? h('p.success', ctrl.prepUploadInfo()) : undefined,
     ctrl.prepUploadError() ? h('p.error', ctrl.prepUploadError()) : undefined,

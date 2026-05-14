@@ -38,7 +38,7 @@ const db = () =>
     db: 'lichess',
   }));
 
-const keyOf = (rootFen: FEN, play: string[]) => `${rootFen}|${play.join(',')}`;
+const keyOf = (rootFen: FEN, play: string[]) => `${rootFen}\0${play.join(',')}`;
 
 const resultKey = (result: string | undefined): 'white' | 'black' | 'draws' | undefined =>
   result === '1-0' ? 'white' : result === '0-1' ? 'black' : result === '1/2-1/2' ? 'draws' : undefined;
