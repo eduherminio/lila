@@ -53,10 +53,15 @@ export default class ExplorerCtrl {
   ) {
     this.allowed = prop(previous ? previous.allowed() : !root.isEmbed);
     this.enabled = storedBooleanProp('analyse.explorer.enabled', false);
-    this.withGames = root.synthetic || replayable(root.data) || !!root.data.opponent.ai;
+    this.withGames = !opts.prep?.enabled && (root.synthetic || replayable(root.data) || !!root.data.opponent.ai);
     this.effectiveVariant =
       root.data.game.variant.key === 'fromPosition' ? 'standard' : root.data.game.variant.key;
     this.config = new ExplorerConfigCtrl(root, this.effectiveVariant, this.reload, previous?.config);
+    if (opts.prep?.enabled) {
+      this.enabled(true);
+      this.config.data.db('player');
+      if (!opts.prep.datasetId) this.config.data.open(true);
+    }
     window.addEventListener('hashchange', this.checkHash, false);
     this.checkHash();
   }
@@ -79,7 +84,7 @@ export default class ExplorerCtrl {
     }
   };
 
-  isAuth = () => defined(myUserId());
+  isAuth = () => !!this.opts.prep?.enabled || defined(myUserId());
 
   reload = () => {
     this.cache = {};
@@ -127,6 +132,7 @@ export default class ExplorerCtrl {
                 play: this.root.nodeList.slice(1).map(s => s.uci!),
                 fen,
                 withGames: this.withGames,
+                isPrep: !!this.opts.prep?.enabled,
               },
               processData,
               this.abortController.signal,
@@ -156,6 +162,12 @@ export default class ExplorerCtrl {
 
   setNode = () => {
     if (!this.enabled()) return;
+    if (this.opts.prep?.enabled && !this.opts.prep.datasetId) {
+      this.cache[this.root.node.fen] = this.empty;
+      this.loading(false);
+      this.failing(null);
+      return;
+    }
     this.gameMenu(null);
     const node = this.root.node;
     if (

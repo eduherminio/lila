@@ -14,7 +14,7 @@ final class AnalyseUi(helpers: Helpers)(endpoints: AnalyseEndpoints):
   def miniSpan(fen: Fen.Board, color: Color = chess.White, lastMove: Option[Uci] = None) =
     chessgroundMini(fen, color, lastMove)(span)
 
-  def explorerAndCevalConfig(using ctx: Context) =
+  def explorerAndCevalConfig(prepExplorer: Option[JsObject] = None)(using ctx: Context) =
     Json.obj(
       "explorer" -> Json.obj(
         "endpoint" -> endpoints.explorer,
@@ -22,14 +22,15 @@ final class AnalyseUi(helpers: Helpers)(endpoints: AnalyseEndpoints):
         "showRatings" -> ctx.pref.showRatings
       ),
       "externalEngineEndpoint" -> endpoints.externalEngine
-    )
+    ).add("prepExplorer", prepExplorer)
 
   def userAnalysis(
       data: JsObject,
       pov: Pov,
       chess960PositionNum: Option[Int] = None,
       withForecast: Boolean = false,
-      inlinePgn: Option[String] = None
+      inlinePgn: Option[String] = None,
+      prepExplorer: Option[JsObject] = None
   )(using ctx: Context): Page =
     val hasWiki = pov.game.synthetic && pov.game.variant.standard
     Page(trans.site.analysis.txt())
@@ -49,7 +50,7 @@ final class AnalyseUi(helpers: Helpers)(endpoints: AnalyseEndpoints):
               "wiki" -> hasWiki
             )
             .add("inlinePgn", inlinePgn) ++
-            explorerAndCevalConfig
+            explorerAndCevalConfig(prepExplorer)
         )
       .i18n(_.study)
       .i18nOpt(ctx.speechSynthesis, _.nvui)

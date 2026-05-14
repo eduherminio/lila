@@ -45,6 +45,11 @@ export class ExplorerConfigCtrl {
   allDbs: ExplorerDb[] = ['lichess', 'player'];
   myName?: string;
   participants: (string | undefined)[];
+  prepUploadText = prop('');
+  prepUploadError = prop<string | null>(null);
+  prepUploadInfo = prop<string | null>(null);
+  prepUploading = prop(false);
+  prepUploadFile?: File;
 
   constructor(
     readonly root: AnalyseCtrl,
@@ -52,11 +57,13 @@ export class ExplorerConfigCtrl {
     readonly onClose: () => void,
     previous?: ExplorerConfigCtrl,
   ) {
+    const prep = root.opts.explorer.prep;
+    if (prep?.enabled) this.allDbs = ['player'];
     this.myName = myUsername();
     this.participants = [root.data.player.user?.username, root.data.opponent.user?.username].filter(
       name => name && name !== this.myName,
     );
-    if (variant === 'standard') this.allDbs.unshift('masters');
+    if (!prep?.enabled && variant === 'standard') this.allDbs.unshift('masters');
     const byDbData = {} as ByDbSettings;
     for (const db of this.allDbs) {
       byDbData[db] = {
@@ -74,7 +81,7 @@ export class ExplorerConfigCtrl {
       byDbData,
       playerName: {
         open: prevData?.playerName.open || prop(false),
-        value: storedStringProp('analyse.explorer.player.name', this.myName || ''),
+        value: storedStringProp('analyse.explorer.player.name', ''),
         previous: storedJsonProp<string[]>('explorer.player.name.previous', () => []),
       },
       color: storedProp<Color>('analyse.explorer.player.color', root.bottomColor(), str => str as Color),
@@ -128,8 +135,49 @@ export class ExplorerConfigCtrl {
   toggleOpen = () => {
     this.data.open(!this.data.open());
     if (!this.data.open()) {
-      if (this.data.db() === 'player' && !this.data.playerName.value()) this.data.db('lichess');
+      if (!this.root.opts.explorer.prep?.enabled && this.data.db() === 'player' && !this.data.playerName.value())
+        this.data.db('lichess');
       this.onClose();
+    }
+  };
+
+  uploadPrepPgn = async () => {
+    const prep = this.root.opts.explorer.prep;
+    if (!prep?.enabled || this.prepUploading()) return;
+    const body = new FormData();
+    const txt = this.prepUploadText().trim();
+    if (txt) body.append('pgn', txt);
+    if (this.prepUploadFile) body.append('file', this.prepUploadFile);
+    if (!txt && !this.prepUploadFile) {
+      this.prepUploadError('Add PGN text or choose a PGN file.');
+      this.root.redraw();
+      return;
+    }
+    this.prepUploadError(null);
+    this.prepUploadInfo(null);
+    this.prepUploading(true);
+    this.root.redraw();
+    try {
+      const res = await fetch(prep.uploadEndpoint, {
+        method: 'POST',
+        body,
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || `Error ${res.status}`);
+      if (Array.isArray(data.players)) {
+        this.data.playerName.previous(data.players.slice(0, 20));
+        if (!this.data.playerName.value() && data.players.length) this.data.playerName.value(data.players[0]);
+      }
+      this.prepUploadInfo(`Imported ${data.games || 0} games.`);
+      this.prepUploadText('');
+      this.prepUploadFile = undefined;
+      const base = prep.datasetPageBase.replace(/\/$/, '');
+      location.assign(`${base}/${data.id}#explorer`);
+    } catch (e) {
+      this.prepUploadError(e instanceof Error ? e.message : 'Upload failed.');
+      this.prepUploading(false);
+      this.root.redraw();
     }
   };
 
@@ -157,12 +205,13 @@ export const view = (ctrl: ExplorerConfigCtrl): VNode[] => [
   ),
 ];
 
-const selectText = 'Select a Lichess player';
+const selectText = 'Select player';
 
 const playerDb = (ctrl: ExplorerConfigCtrl) => {
   const name = ctrl.data.playerName.value();
   return h('div.player-db', [
     ctrl.data.playerName.open() ? playerModal(ctrl) : undefined,
+    ctrl.root.opts.explorer.prep?.enabled ? prepUploadSection(ctrl) : undefined,
     h('section.name', [
       h('label', i18n.site.player),
       h('div', [
@@ -187,11 +236,53 @@ const playerDb = (ctrl: ExplorerConfigCtrl) => {
         ),
       ]),
     ]),
-    speedSection(ctrl),
+    ctrl.root.opts.explorer.prep?.enabled ? undefined : speedSection(ctrl),
     modeSection(ctrl),
-    monthSection(ctrl),
+    ctrl.root.opts.explorer.prep?.enabled ? undefined : monthSection(ctrl),
   ]);
 };
+
+const prepUploadSection = (ctrl: ExplorerConfigCtrl) =>
+  h('section.prep-upload', [
+    h('label', 'Upload PGN dataset'),
+    h('textarea.form-control', {
+      attrs: { placeholder: 'Paste one or many PGNs' },
+      props: { value: ctrl.prepUploadText() },
+      hook: {
+        insert: vnode =>
+          (vnode.elm as HTMLTextAreaElement).addEventListener('input', e =>
+            ctrl.prepUploadText((e.target as HTMLTextAreaElement).value),
+          ),
+        update: (_, vnode) => {
+          const el = vnode.elm as HTMLTextAreaElement;
+          if (el.value !== ctrl.prepUploadText()) el.value = ctrl.prepUploadText();
+        },
+      },
+    }),
+    h('input.form-control', {
+      attrs: { type: 'file', accept: '.pgn,text/plain' },
+      hook: {
+        insert: vnode =>
+          (vnode.elm as HTMLInputElement).addEventListener(
+            'change',
+            e => (ctrl.prepUploadFile = (e.target as HTMLInputElement).files?.[0]),
+          ),
+      },
+    }),
+    h(
+      'button.button.button-metal.text',
+      {
+        attrs: {
+          ...dataIcon(licon.UploadCloud),
+          disabled: ctrl.prepUploading(),
+        },
+        hook: bind('click', ctrl.uploadPrepPgn, ctrl.root.redraw),
+      },
+      ctrl.prepUploading() ? 'Uploading...' : 'Upload',
+    ),
+    ctrl.prepUploadInfo() ? h('p.success', ctrl.prepUploadInfo()) : undefined,
+    ctrl.prepUploadError() ? h('p.error', ctrl.prepUploadError()) : undefined,
+  ]);
 
 const masterDb = (ctrl: ExplorerConfigCtrl) =>
   h('div', [

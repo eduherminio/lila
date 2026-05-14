@@ -205,11 +205,12 @@ const closeButton = (ctrl: AnalyseCtrl): VNode =>
 
 const showEmpty = (ctrl: AnalyseCtrl, data?: OpeningData): VNode => {
   const isTooDeep = ctrl.explorer.root.node.ply >= MAX_ANALYSE_DEPTH;
+  const isPrepEmpty = !!ctrl.explorer.opts.prep?.enabled && !ctrl.explorer.opts.prep.datasetId;
   return hl('div.data.empty', [
     explorerTitle(ctrl.explorer),
     openingTitle(ctrl, data),
     hl('div.message', [
-      hl('strong', isTooDeep ? i18n.site.maxDepthReached : i18n.site.noGameFound),
+      hl('strong', isPrepEmpty ? 'Upload PGN games to start exploring.' : isTooDeep ? i18n.site.maxDepthReached : i18n.site.noGameFound),
       data?.queuePosition
         ? hl('p.explanation', `Indexing ${data.queuePosition} other players first ...`)
         : !(ctrl.explorer.config.fullHouse() || isTooDeep) &&
@@ -244,7 +245,7 @@ export const clearLastShow = () => {
 function show(ctrl: AnalyseCtrl): MaybeVNode {
   const data = ctrl.explorer.current();
   if (data && isOpening(data)) {
-    if (!ctrl.explorer.isAuth()) return showAnon(ctrl);
+    if (!ctrl.explorer.isAuth() && !ctrl.explorer.opts.prep?.enabled) return showAnon(ctrl);
     const moveTable = showMoveTable(ctrl, data),
       recentTable = showGameTable(ctrl, data.fen, i18n.site.recentGames, data.recentGames || []),
       topTable = showGameTable(ctrl, data.fen, i18n.site.topGames, data.topGames || []);

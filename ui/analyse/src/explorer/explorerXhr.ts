@@ -13,6 +13,7 @@ interface OpeningXhrOpts {
   variant?: VariantKey; // only lichess & player
   config: ExplorerConfigData;
   withGames?: boolean;
+  isPrep?: boolean;
 }
 
 export async function opening(
@@ -40,9 +41,11 @@ export async function opening(
   }
   if (opts.db === 'player') {
     const playerName = conf.playerName.value();
-    if (!playerName) throw new Error('Missing player name');
-    params.set('player', playerName);
-    params.set('color', conf.color());
+    if (!playerName && !opts.isPrep) throw new Error('Missing player name');
+    if (playerName) {
+      params.set('player', playerName);
+      params.set('color', conf.color());
+    }
     params.set('modes', conf.mode().join(','));
   }
   if (!opts.withGames) {

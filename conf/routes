@@ -228,6 +228,12 @@ GET   /analysis/*something             controllers.UserAnalysis.parseArg(somethi
 GET   /analysis                        controllers.UserAnalysis.index
 GET   /embed/analysis                  controllers.UserAnalysis.embed
 
+# Prep Explorer
+GET   /prep-explorer                   controllers.PrepExplorer.index
+GET   /prep-explorer/:dataset          controllers.PrepExplorer.show(dataset)
+POST  /api/prep-explorer/upload        controllers.PrepExplorer.upload
+GET   /api/prep-explorer/:dataset/player controllers.PrepExplorer.player(dataset)
+
 # Study
 GET   /study                           controllers.Study.allDefault(page: Int ?= 1)
 GET   /study/staff-picks               controllers.Study.staffPicks

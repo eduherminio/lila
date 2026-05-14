@@ -15,6 +15,12 @@ export interface ExplorerOpts {
   endpoint: string;
   tablebaseEndpoint: string;
   showRatings: boolean;
+  prep?: {
+    enabled: boolean;
+    datasetId?: string;
+    uploadEndpoint: string;
+    datasetPageBase: string;
+  };
 }
 
 export interface ExplorerData {
