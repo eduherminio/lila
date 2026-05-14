@@ -86,7 +86,7 @@ export async function importPrepPgnDataset(datasetId: string, pgn: string) {
     const start = startingPosition(game.headers).unwrap();
     if (start.rules !== 'chess') continue;
 
-    const rootFen: FEN = game.headers.get('FEN') || makeFen(start.toSetup());
+    const startingFen: FEN = game.headers.get('FEN') || makeFen(start.toSetup());
 
     let tree = game.moves;
     const pos = start;
@@ -99,7 +99,7 @@ export async function importPrepPgnDataset(datasetId: string, pgn: string) {
       if (!move) break;
       const san = makeSanAndPlay(pos, move);
       const uci = makeUci(move);
-      upsertPosition(positions, keyOf(rootFen, play), uci, san, result);
+      upsertPosition(positions, keyOf(startingFen, play), uci, san, result);
       play.push(uci);
       tree = mainline;
       addedAnyMove = true;
