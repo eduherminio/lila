@@ -160,7 +160,9 @@ export class ExplorerConfigCtrl {
       const datasetId =
         prep.datasetId ||
         getActivePrepDatasetId() ||
-        `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+        (typeof window !== 'undefined' && 'crypto' in window && 'randomUUID' in window.crypto
+          ? window.crypto.randomUUID()
+          : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`);
       const data = await importPrepPgnDataset(datasetId, pgn);
       prep.datasetId = data.id;
       if (Array.isArray(data.players)) {
