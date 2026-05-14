@@ -81,7 +81,7 @@ export class ExplorerConfigCtrl {
       byDbData,
       playerName: {
         open: prevData?.playerName.open || prop(false),
-        value: storedStringProp('analyse.explorer.player.name', ''),
+        value: storedStringProp('analyse.explorer.player.name', prep?.enabled ? '' : this.myName || ''),
         previous: storedJsonProp<string[]>('explorer.player.name.previous', () => []),
       },
       color: storedProp<Color>('analyse.explorer.player.color', root.bottomColor(), str => str as Color),
@@ -205,7 +205,7 @@ export const view = (ctrl: ExplorerConfigCtrl): VNode[] => [
   ),
 ];
 
-const selectText = 'Select player';
+const selectText = i18n.site.player;
 
 const playerDb = (ctrl: ExplorerConfigCtrl) => {
   const name = ctrl.data.playerName.value();

@@ -100,13 +100,16 @@ object PrepExplorer:
 
   private val maxPgnBytes = 3_000_000
   private val maxGames = 5_000
+  // Anonymous uploaded datasets are ephemeral and automatically cleaned up.
   private val datasetTtl = 24.hours
+
+  private case class MoveStep(uci: String, san: String)
 
   private case class DatasetGame(
       white: String,
       black: String,
       winner: Option[Color],
-      moves: Vector[String]
+      moves: Vector[MoveStep]
   ):
     def colorName(color: Color) = if color.white then white else black
 
@@ -122,6 +125,7 @@ object PrepExplorer:
   case class CreateResult(id: String, gameCount: Int, errors: Vector[String], players: Vector[String])
 
   private object PrepExplorerStore:
+    // Intentionally in-memory for MVP simplicity; data is lost on restart.
     private val datasets = TrieMap.empty[String, Dataset]
 
     def create(rawPgn: String): Either[String, CreateResult] =
@@ -140,9 +144,9 @@ object PrepExplorer:
                 none
               case Right(parsed) =>
                 val tags = parsed.parsed.tags
-                val white = tags("White") | "White"
-                val black = tags("Black") | "Black"
-                val moves = parsed.replay.chronoMoves.map(_.toUci.uci).toVector
+                val white = tags("White") | "Unknown White"
+                val black = tags("Black") | "Unknown Black"
+                val moves = parsed.replay.chronoMoves.map(m => MoveStep(m.toUci.uci, m.toSanStr.value)).toVector
                 Option.when(moves.nonEmpty):
                   DatasetGame(
                     white = white,
@@ -197,24 +201,29 @@ object PrepExplorer:
             case Some(chess.White) => white += 1
             case Some(chess.Black) => black += 1
             case _ => draws += 1
-          g.moves.lift(prefix.size).foreach: uci =>
-            val (w, d, b) = moveAcc.getOrElse(uci, (0, 0, 0))
+          g.moves.lift(prefix.size).foreach: step =>
+            val (w, d, b) = moveAcc.getOrElse(step.uci, (0, 0, 0))
             val updated = g.winner match
               case Some(chess.White) => (w + 1, d, b)
               case Some(chess.Black) => (w, d, b + 1)
               case _ => (w, d + 1, b)
-            moveAcc.update(uci, updated)
+            moveAcc.update(step.uci, updated)
+
+        val sanByUci = inPosition
+          .flatMap(_.moves.lift(prefix.size))
+          .map(step => step.uci -> step.san)
+          .toMap
 
         val moves = moveAcc.toVector
           .sortBy: (_, (w, d, b)) =>
             -(w + d + b)
           .map: (uci, (w, d, b)) =>
-            Json.obj(
-              "uci" -> uci,
-              "san" -> uci,
-              "white" -> w,
-              "draws" -> d,
-              "black" -> b
+              Json.obj(
+                "uci" -> uci,
+                "san" -> sanByUci.getOrElse(uci, uci),
+                "white" -> w,
+                "draws" -> d,
+                "black" -> b
             )
 
         Json.obj(
@@ -226,8 +235,8 @@ object PrepExplorer:
           "recentGames" -> Json.arr()
         )
 
-    private def hasPrefix(moves: Vector[String], prefix: Vector[String]) =
-      prefix.size <= moves.size && prefix.indices.forall(i => moves(i) == prefix(i))
+    private def hasPrefix(moves: Vector[MoveStep], prefix: Vector[String]) =
+      prefix.size <= moves.size && prefix.indices.forall(i => moves(i).uci == prefix(i))
 
     private def splitGames(rawPgn: String): Vector[String] =
       val normalized = rawPgn.replace("\r\n", "\n").trim
