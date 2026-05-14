@@ -126,6 +126,7 @@ export default class ExplorerCtrl {
             .opening(
               {
                 ...this.baseXhrOpening(),
+                datasetId: this.opts.prep?.datasetId,
                 db: this.db(),
                 variant: this.effectiveVariant,
                 rootFen: this.root.nodeList[0].fen,

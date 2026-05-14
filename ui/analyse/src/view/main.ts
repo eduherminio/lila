@@ -42,6 +42,7 @@ export default function (deps?: typeof studyDeps) {
 
 function analyseView(ctrl: AnalyseCtrl, deps?: typeof studyDeps): VNode {
   const ctx = viewContext(ctrl, deps);
+  const prepMode = !!ctrl.opts.explorer.prep?.enabled;
   return renderMain(
     ctx,
     ctrl.keyboardHelp && keyboardView(ctrl),
@@ -65,8 +66,9 @@ function analyseView(ctrl: AnalyseCtrl, deps?: typeof studyDeps): VNode {
         }),
       },
       [
-        ctrl.forecast && forecastView(ctrl, ctrl.forecast),
-        !ctrl.synthetic &&
+        !prepMode && ctrl.forecast && forecastView(ctrl, ctrl.forecast),
+        !prepMode &&
+          !ctrl.synthetic &&
           playable(ctrl.data) &&
           hl(
             'div.back-to-game',
@@ -83,8 +85,8 @@ function analyseView(ctrl: AnalyseCtrl, deps?: typeof studyDeps): VNode {
           ),
       ],
     ),
-    ctrl.chatCtrl && renderChat(ctrl.chatCtrl, { insert: v => fixChatHeight(v.elm) }),
-    hl('div.chat__members.none', { hook: onInsert(watchers) }),
+    !prepMode && ctrl.chatCtrl && renderChat(ctrl.chatCtrl, { insert: v => fixChatHeight(v.elm) }),
+    !prepMode && hl('div.chat__members.none', { hook: onInsert(watchers) }),
   );
 }
 

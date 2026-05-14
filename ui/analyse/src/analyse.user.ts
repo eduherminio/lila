@@ -1,6 +1,7 @@
 import { wsConnect } from 'lib/socket';
 
 import makeBoot from './boot';
+import { getActivePrepDatasetId } from './explorer/prepLocalStore';
 import makeStart from './start';
 import { patch } from './view/util';
 
@@ -16,11 +17,18 @@ export async function initModule({ mode, cfg }: { mode: 'userAnalysis' | 'replay
 }
 
 function userAnalysis(cfg: any) {
-  if (cfg.prepExplorer) {
+  const isPrepExplorer = !!cfg.prepExplorer;
+  if (isPrepExplorer) {
     cfg.explorer.prep = cfg.prepExplorer;
-    cfg.explorer.endpoint = `/api/prep-explorer/${cfg.prepExplorer.datasetId || 'no-dataset'}/`;
+    cfg.explorer.prep.datasetId ||= getActivePrepDatasetId();
+    cfg.explorer.endpoint = 'local://prep-explorer/';
   }
   cfg.$side = $('.analyse__side').clone();
+  if (isPrepExplorer) {
+    cfg.socketSend = (() => undefined) as typeof cfg.socketSend;
+    start(cfg);
+    return;
+  }
   cfg.socketSend = wsConnect(cfg.socketUrl || '/analysis/socket/v5', cfg.socketVersion, {
     receive: (t: string, d: any) => analyse.socketReceive(t, d),
   }).send;

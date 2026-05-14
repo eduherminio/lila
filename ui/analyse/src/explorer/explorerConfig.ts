@@ -11,6 +11,7 @@ import { userComplete } from 'lib/view/userComplete';
 import type AnalyseCtrl from '../ctrl';
 import { ucfirst } from './explorerUtil';
 import type { ExplorerDb, ExplorerSpeed, ExplorerMode } from './interfaces';
+import { getActivePrepDatasetId, importPrepPgnDataset } from './prepLocalStore';
 
 const allSpeeds: ExplorerSpeed[] = ['ultraBullet', 'bullet', 'blitz', 'rapid', 'classical', 'correspondence'];
 const allModes: ExplorerMode[] = ['casual', 'rated'];
@@ -144,10 +145,7 @@ export class ExplorerConfigCtrl {
   uploadPrepPgn = async () => {
     const prep = this.root.opts.explorer.prep;
     if (!prep?.enabled || this.prepUploading()) return;
-    const body = new FormData();
     const txt = this.prepUploadText().trim();
-    if (txt) body.append('pgn', txt);
-    if (this.prepUploadFile) body.append('file', this.prepUploadFile);
     if (!txt && !this.prepUploadFile) {
       this.prepUploadError('Add PGN text or choose a PGN file.');
       this.root.redraw();
@@ -158,25 +156,26 @@ export class ExplorerConfigCtrl {
     this.prepUploading(true);
     this.root.redraw();
     try {
-      const res = await fetch(prep.uploadEndpoint, {
-        method: 'POST',
-        body,
-        credentials: 'include',
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || `Error ${res.status}`);
+      const pgn = txt || (await this.prepUploadFile!.text());
+      const datasetId =
+        prep.datasetId ||
+        getActivePrepDatasetId() ||
+        `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      const data = await importPrepPgnDataset(datasetId, pgn);
+      prep.datasetId = data.id;
       if (Array.isArray(data.players)) {
         this.data.playerName.previous(data.players.slice(0, 20));
         if (!this.data.playerName.value() && data.players.length) this.data.playerName.value(data.players[0]);
       }
-      this.prepUploadInfo(`Imported ${data.games || 0} games.`);
+      this.prepUploadInfo(`Imported ${data.games || 0} games into browser storage.`);
       this.prepUploadText('');
       this.prepUploadFile = undefined;
-      const base = prep.datasetPageBase.replace(/\/$/, '');
-      location.assign(`${base}/${data.id}#explorer`);
+      this.onClose();
     } catch (e) {
-      this.prepUploadError(e instanceof Error ? e.message : 'Upload failed.');
+      this.prepUploadError(e instanceof Error ? e.message : 'Import failed.');
+    } finally {
       this.prepUploading(false);
+      this.root.explorer.reload();
       this.root.redraw();
     }
   };
@@ -244,7 +243,7 @@ const playerDb = (ctrl: ExplorerConfigCtrl) => {
 
 const prepUploadSection = (ctrl: ExplorerConfigCtrl) =>
   h('section.prep-upload', [
-    h('label', 'Upload PGN dataset'),
+    h('label', 'Import PGN dataset (browser only)'),
     h('textarea.form-control', {
       attrs: { placeholder: 'Paste one or many PGNs' },
       props: { value: ctrl.prepUploadText() },

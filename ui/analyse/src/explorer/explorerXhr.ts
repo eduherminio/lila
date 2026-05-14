@@ -3,9 +3,11 @@ import { readNdJson } from 'lib/xhr';
 
 import type { ExplorerConfigData } from './explorerConfig';
 import type { ExplorerDb, OpeningData, TablebaseData } from './interfaces';
+import { queryPrepOpening } from './prepLocalStore';
 
 interface OpeningXhrOpts {
   endpoint: string;
+  datasetId?: string;
   db: ExplorerDb;
   rootFen: FEN;
   play: string[];
@@ -21,6 +23,17 @@ export async function opening(
   processData: (data: OpeningData) => void,
   signal?: AbortSignal,
 ): Promise<void> {
+  if (opts.isPrep && opts.endpoint.startsWith('local://prep-explorer')) {
+    processData(
+      await queryPrepOpening({
+        datasetId: opts.datasetId,
+        rootFen: opts.rootFen,
+        play: opts.play,
+        fen: opts.fen,
+      }),
+    );
+    return;
+  }
   const conf = opts.config;
   const confByDb = conf.byDb();
   const url = new URL(`./${opts.db}`, opts.endpoint);
