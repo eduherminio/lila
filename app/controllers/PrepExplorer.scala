@@ -246,8 +246,7 @@ object PrepExplorer:
         if chunks.nonEmpty then chunks else Vector(normalized)
 
     private def purgeExpired(now: Instant): Unit =
-      datasets.foreach: (id, ds) =>
-        if ds.expiresAt.isBefore(now) then datasets.remove(id)
+      datasets.filterInPlace((_, ds) => !ds.expiresAt.isBefore(now))
 
     private def randomId(): String =
       val alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
